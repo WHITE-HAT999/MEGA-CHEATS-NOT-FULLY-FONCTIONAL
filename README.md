@@ -1,4 +1,4 @@
--- LocalScript inside StarterPlayer > StarterPlayerScripts
+-- ⚡ Unified Control Hub with Tabs (General + Teleport/Fling)
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -8,13 +8,13 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- ScreenGui
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "PlayerControlGUI"
+screenGui.Name = "UnifiedControlHub"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 -- Main Frame
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 440)
+frame.Size = UDim2.new(0, 320, 0, 520)
 frame.Position = UDim2.new(0.05, 0, 0.25, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 frame.BorderSizePixel = 0
@@ -22,10 +22,7 @@ frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 15)
-uiCorner.Parent = frame
-
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 15)
 local uiStroke = Instance.new("UIStroke")
 uiStroke.Thickness = 3
 uiStroke.Color = Color3.fromRGB(0, 255, 180)
@@ -35,17 +32,13 @@ uiStroke.Parent = frame
 -- Title bar
 local titleBar = Instance.new("TextLabel")
 titleBar.Size = UDim2.new(1, -40, 0, 40)
-titleBar.Position = UDim2.new(0, 0, 0, 0)
 titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
 titleBar.Text = "⚡ Control Hub ⚡"
 titleBar.TextColor3 = Color3.fromRGB(0, 255, 200)
 titleBar.Font = Enum.Font.FredokaOne
 titleBar.TextSize = 20
 titleBar.Parent = frame
-
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 12)
-titleCorner.Parent = titleBar
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 12)
 
 -- Minimize Button
 local minButton = Instance.new("TextButton")
@@ -53,316 +46,370 @@ minButton.Size = UDim2.new(0, 40, 0, 40)
 minButton.Position = UDim2.new(1, -40, 0, 0)
 minButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
 minButton.Text = "–"
-minButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minButton.TextColor3 = Color3.new(1,1,1)
 minButton.Font = Enum.Font.GothamBold
 minButton.TextSize = 22
 minButton.Parent = frame
-
-local minCorner = Instance.new("UICorner")
-minCorner.CornerRadius = UDim.new(0, 12)
-minCorner.Parent = minButton
+Instance.new("UICorner", minButton).CornerRadius = UDim.new(0, 12)
 
 local minimized = false
 
--- Function to create input boxes
-local function createBox(placeholder, yPos)
+-- Tab buttons
+local tabFrame = Instance.new("Frame")
+tabFrame.Size = UDim2.new(1, 0, 0, 35)
+tabFrame.Position = UDim2.new(0, 0, 0, 40)
+tabFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+tabFrame.Parent = frame
+
+local function makeTabButton(text, xPos)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0.5, 0, 1, 0)
+	btn.Position = UDim2.new(xPos, 0, 0, 0)
+	btn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+	btn.Text = text
+	btn.Font = Enum.Font.GothamBold
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.TextSize = 16
+	btn.Parent = tabFrame
+	return btn
+end
+
+local generalTab = makeTabButton("General", 0)
+local teleportTab = makeTabButton("Teleport", 0.5)
+generalTab.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+
+-- Scrolling area
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, 0, 1, -75)
+scroll.Position = UDim2.new(0, 0, 0, 75)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 6
+scroll.CanvasSize = UDim2.new()
+scroll.Parent = frame
+
+-- General Container
+local generalContainer = Instance.new("Frame")
+generalContainer.Size = UDim2.new(1,0,0,0)
+generalContainer.BackgroundTransparency = 1
+generalContainer.Parent = scroll
+
+local generalLayout = Instance.new("UIListLayout")
+generalLayout.Parent = generalContainer
+generalLayout.Padding = UDim.new(0,10)
+
+-- Teleport Container
+local teleportContainer = Instance.new("Frame")
+teleportContainer.Size = UDim2.new(1,0,0,0)
+teleportContainer.BackgroundTransparency = 1
+teleportContainer.Parent = scroll
+teleportContainer.Visible = false
+
+local teleportLayout = Instance.new("UIListLayout")
+teleportLayout.Parent = teleportContainer
+teleportLayout.Padding = UDim.new(0,10)
+
+-- Update scroll size automatically
+local function updateCanvas(container)
+	container.Size = UDim2.new(1,0,0,generalLayout.AbsoluteContentSize.Y)
+	scroll.CanvasSize = UDim2.new(0,0,0,container.Size.Y.Offset)
+end
+generalLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	updateCanvas(generalContainer)
+end)
+teleportLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	updateCanvas(teleportContainer)
+end)
+
+-- === GENERAL CONTENT ===
+local function createBox(parent, placeholder)
 	local box = Instance.new("TextBox")
 	box.PlaceholderText = placeholder
-	box.Text = ""
-	box.Size = UDim2.new(0.85, 0, 0, 30)
-	box.Position = UDim2.new(0.075, 0, 0, yPos)
-	box.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-	box.TextColor3 = Color3.fromRGB(255, 255, 255)
+	box.Size = UDim2.new(0.9, 0, 0, 30)
+	box.BackgroundColor3 = Color3.fromRGB(40,40,60)
+	box.TextColor3 = Color3.new(1,1,1)
 	box.Font = Enum.Font.Gotham
 	box.TextSize = 16
 	box.ClearTextOnFocus = false
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = box
-
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(0, 200, 255)
-	stroke.Thickness = 1.5
-	stroke.Parent = box
-
-	box.Parent = frame
+	box.Parent = parent
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
 	return box
 end
 
--- Input boxes
-local wsBox = createBox("WalkSpeed", 50)
-local jpBox = createBox("JumpPower", 90)
-local gBox  = createBox("Gravity", 130)
-local hhBox = createBox("HipHeight", 170)
+local wsBox = createBox(generalContainer,"WalkSpeed")
+local jpBox = createBox(generalContainer,"JumpPower")
+local gBox  = createBox(generalContainer,"Gravity")
+local hhBox = createBox(generalContainer,"HipHeight")
 
--- Feature Toggles
-local toggles = {
-	{ name = "Night Vision", key = "nightVision", state = false, y = 210 },
-	{ name = "Infinite Jump", key = "infJump", state = false, y = 245 },
-	{ name = "NoClip", key = "noclip", state = false, y = 280 },
-	{ name = "Fly", key = "fly", state = false, y = 315 },
-}
-
-local toggleStates = {}
-
-for _, data in pairs(toggles) do
-	local button = Instance.new("TextButton")
-	button.Text = "OFF - " .. data.name
-	button.Size = UDim2.new(0.85, 0, 0, 25)
-	button.Position = UDim2.new(0.075, 0, 0, data.y)
-	button.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
-	button.TextColor3 = Color3.fromRGB(255, 255, 255)
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 14
-	button.Parent = frame
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = button
-
-	toggleStates[data.key] = false
-
-	button.MouseButton1Click:Connect(function()
-		toggleStates[data.key] = not toggleStates[data.key]
-		if toggleStates[data.key] then
-			button.Text = "ON - " .. data.name
-			button.BackgroundColor3 = Color3.fromRGB(30, 80, 30)
+local toggleStates = {nightVision=false, infJump=false, noclip=false, fly=false}
+local function createToggle(name,key)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0.9,0,0,30)
+	btn.BackgroundColor3 = Color3.fromRGB(80,30,30)
+	btn.Text = "OFF - "..name
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.Parent = generalContainer
+	btn.MouseButton1Click:Connect(function()
+		toggleStates[key]=not toggleStates[key]
+		if toggleStates[key] then
+			btn.Text="ON - "..name
+			btn.BackgroundColor3=Color3.fromRGB(30,80,30)
 		else
-			button.Text = "OFF - " .. data.name
-			button.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
+			btn.Text="OFF - "..name
+			btn.BackgroundColor3=Color3.fromRGB(80,30,30)
 		end
 	end)
 end
 
--- Dropdown for teleport
-local tpDropdown = Instance.new("TextButton")
-tpDropdown.Size = UDim2.new(0.85, 0, 0, 30)
-tpDropdown.Position = UDim2.new(0.075, 0, 0, 350)
-tpDropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-tpDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpDropdown.Font = Enum.Font.GothamBold
-tpDropdown.TextSize = 14
-tpDropdown.Text = "Select Player"
-tpDropdown.Parent = frame
+createToggle("Night Vision","nightVision")
+createToggle("Infinite Jump","infJump")
+createToggle("NoClip","noclip")
+createToggle("Fly","fly")
 
-local tpCorner = Instance.new("UICorner")
-tpCorner.CornerRadius = UDim.new(0, 8)
-tpCorner.Parent = tpDropdown
+local applyBtn = Instance.new("TextButton")
+applyBtn.Size = UDim2.new(0.9,0,0,35)
+applyBtn.Text = "✔ ACTIVATE"
+applyBtn.BackgroundColor3 = Color3.fromRGB(0,200,150)
+applyBtn.TextColor3 = Color3.new(1,1,1)
+applyBtn.Font = Enum.Font.GothamBold
+applyBtn.TextSize = 16
+applyBtn.Parent = generalContainer
 
-local selectedPlayer = nil
+local resetBtn = Instance.new("TextButton")
+resetBtn.Size = UDim2.new(0.9,0,0,30)
+resetBtn.Text = "🔄 RESET DEFAULTS"
+resetBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
+resetBtn.TextColor3 = Color3.new(1,1,1)
+resetBtn.Font = Enum.Font.GothamBold
+resetBtn.TextSize = 14
+resetBtn.Parent = generalContainer
 
--- Dropdown logic
-tpDropdown.MouseButton1Click:Connect(function()
-	local dropdownFrame = Instance.new("Frame")
-	dropdownFrame.Size = UDim2.new(0.85, 0, 0, 120)
-	dropdownFrame.Position = UDim2.new(0.075, 0, 0, 380)
-	dropdownFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-	dropdownFrame.Parent = frame
+-- === TELEPORT CONTENT ===
+local nameBox = createBox(teleportContainer,"Type player name (full or partial)")
+local dropdownBtn = Instance.new("TextButton")
+dropdownBtn.Size = UDim2.new(0.9,0,0,28)
+dropdownBtn.Text = "Select ▼"
+dropdownBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+dropdownBtn.TextColor3 = Color3.new(1,1,1)
+dropdownBtn.Font = Enum.Font.Gotham
+dropdownBtn.TextSize = 15
+dropdownBtn.Parent = teleportContainer
 
-	local listLayout = Instance.new("UIListLayout")
-	listLayout.Parent = dropdownFrame
+local dropdownContainer = Instance.new("ScrollingFrame")
+dropdownContainer.Size = UDim2.new(0.9,0,0,100)
+dropdownContainer.BackgroundColor3 = Color3.fromRGB(30,30,30)
+dropdownContainer.Visible = false
+dropdownContainer.ScrollBarThickness = 6
+dropdownContainer.Parent = teleportContainer
 
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player then
-			local option = Instance.new("TextButton")
-			option.Size = UDim2.new(1, 0, 0, 30)
-			option.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-			option.TextColor3 = Color3.fromRGB(255, 255, 255)
-			option.Text = plr.Name
-			option.Font = Enum.Font.Gotham
-			option.TextSize = 14
-			option.Parent = dropdownFrame
+local dropLayout = Instance.new("UIListLayout")
+dropLayout.Parent = dropdownContainer
+local dropdownButtons = {}
 
-			option.MouseButton1Click:Connect(function()
-				selectedPlayer = plr
-				tpDropdown.Text = "Target: " .. plr.Name
-				dropdownFrame:Destroy()
+local function updateDropdown()
+	for _,btn in pairs(dropdownButtons) do btn:Destroy() end
+	dropdownButtons={}
+	for _,p in ipairs(Players:GetPlayers()) do
+		if p~=player then
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1,-5,0,25)
+			btn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+			btn.Text=p.Name
+			btn.TextColor3 = Color3.new(1,1,1)
+			btn.Font=Enum.Font.Gotham
+			btn.TextSize=14
+			btn.Parent=dropdownContainer
+			btn.MouseButton1Click:Connect(function()
+				nameBox.Text=p.Name
+				dropdownContainer.Visible=false
 			end)
+			table.insert(dropdownButtons,btn)
 		end
 	end
+	dropdownContainer.CanvasSize=UDim2.new(0,0,0,#dropdownButtons*30)
+end
+dropdownBtn.MouseButton1Click:Connect(function()
+	updateDropdown()
+	dropdownContainer.Visible=not dropdownContainer.Visible
 end)
 
--- Teleport button
-local tpButton = Instance.new("TextButton")
-tpButton.Text = "Teleport"
-tpButton.Size = UDim2.new(0.85, 0, 0, 30)
-tpButton.Position = UDim2.new(0.075, 0, 0, 410)
-tpButton.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
-tpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpButton.Font = Enum.Font.GothamBold
-tpButton.TextSize = 16
-tpButton.Parent = frame
+local flingBtn = Instance.new("TextButton")
+flingBtn.Size = UDim2.new(0.9,0,0,35)
+flingBtn.Text="▶️ Fling Once"
+flingBtn.BackgroundColor3=Color3.fromRGB(70,70,70)
+flingBtn.TextColor3=Color3.new(1,1,1)
+flingBtn.Font=Enum.Font.GothamBold
+flingBtn.TextSize=16
+flingBtn.Parent=teleportContainer
 
-local tpCorner2 = Instance.new("UICorner")
-tpCorner2.CornerRadius = UDim.new(0, 8)
-tpCorner2.Parent = tpButton
+local loopBtn = Instance.new("TextButton")
+loopBtn.Size = UDim2.new(0.9,0,0,35)
+loopBtn.Text="🔁 Loop Fling: OFF"
+loopBtn.BackgroundColor3=Color3.fromRGB(70,70,70)
+loopBtn.TextColor3=Color3.new(1,1,1)
+loopBtn.Font=Enum.Font.GothamBold
+loopBtn.TextSize=14
+loopBtn.Parent=teleportContainer
 
-tpButton.MouseButton1Click:Connect(function()
-	if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
-		local character = player.Character or player.CharacterAdded:Wait()
-		local root = character:FindFirstChild("HumanoidRootPart")
-		if root then
-			root.CFrame = selectedPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(2,0,2)
-		end
-	end
+-- === LOGIC ===
+applyBtn.MouseButton1Click:Connect(function()
+	local char=player.Character or player.CharacterAdded:Wait()
+	local hum=char:WaitForChild("Humanoid")
+	hum.UseJumpPower=true
+	if tonumber(wsBox.Text) then hum.WalkSpeed=tonumber(wsBox.Text) end
+	if tonumber(jpBox.Text) then hum.JumpPower=tonumber(jpBox.Text) end
+	if tonumber(gBox.Text) then workspace.Gravity=tonumber(gBox.Text) end
+	if tonumber(hhBox.Text) then hum.HipHeight=tonumber(hhBox.Text) end
 end)
 
--- Apply Button
-local applyButton = Instance.new("TextButton")
-applyButton.Text = "✔ APPLY"
-applyButton.Size = UDim2.new(0.85, 0, 0, 35)
-applyButton.Position = UDim2.new(0.075, 0, 0, 450)
-applyButton.BackgroundColor3 = Color3.fromRGB(0, 200, 150)
-applyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-applyButton.Font = Enum.Font.GothamBold
-applyButton.TextSize = 18
-applyButton.Parent = frame
-
-local applyCorner = Instance.new("UICorner")
-applyCorner.CornerRadius = UDim.new(0, 10)
-applyCorner.Parent = applyButton
-
--- Reset Button
-local resetButton = Instance.new("TextButton")
-resetButton.Text = "🔄 RESET DEFAULTS"
-resetButton.Size = UDim2.new(0.85, 0, 0, 30)
-resetButton.Position = UDim2.new(0.075, 0, 0, 490)
-resetButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-resetButton.Font = Enum.Font.GothamBold
-resetButton.TextSize = 16
-resetButton.Parent = frame
-
-local resetCorner = Instance.new("UICorner")
-resetCorner.CornerRadius = UDim.new(0, 10)
-resetCorner.Parent = resetButton
-
--- APPLY SETTINGS
-applyButton.MouseButton1Click:Connect(function()
-	local character = player.Character or player.CharacterAdded:Wait()
-	local humanoid = character:WaitForChild("Humanoid")
-
-	humanoid.UseJumpPower = true
-
-	local ws = tonumber(wsBox.Text)
-	if ws then humanoid.WalkSpeed = ws end
-
-	local jp = tonumber(jpBox.Text)
-	if jp then humanoid.JumpPower = jp end
-
-	local g = tonumber(gBox.Text)
-	if g then workspace.Gravity = g end
-
-	local hh = tonumber(hhBox.Text)
-	if hh then humanoid.HipHeight = hh end
+resetBtn.MouseButton1Click:Connect(function()
+	local char=player.Character or player.CharacterAdded:Wait()
+	local hum=char:WaitForChild("Humanoid")
+	hum.WalkSpeed,hum.JumpPower,hum.HipHeight=16,50,2
+	workspace.Gravity=196.2
+	wsBox.Text,jpBox.Text,gBox.Text,hhBox.Text=""
+	for k in pairs(toggleStates) do toggleStates[k]=false end
 end)
 
--- RESET DEFAULTS
-resetButton.MouseButton1Click:Connect(function()
-	local character = player.Character or player.CharacterAdded:Wait()
-	local humanoid = character:WaitForChild("Humanoid")
-
-	humanoid.WalkSpeed = 16
-	humanoid.JumpPower = 50
-	humanoid.HipHeight = 2
-	workspace.Gravity = 196.2
-
-	wsBox.Text, jpBox.Text, gBox.Text, hhBox.Text = "", "", "", ""
-	selectedPlayer = nil
-	tpDropdown.Text = "Select Player"
-
-	for key, _ in pairs(toggleStates) do toggleStates[key] = false end
-end)
-
--- FEATURE LOGIC
 -- Night Vision
 RunService.RenderStepped:Connect(function()
 	if toggleStates.nightVision then
-		game.Lighting.Brightness = 5
-		game.Lighting.Ambient = Color3.new(0, 1, 0.5)
+		game.Lighting.Brightness=5
+		game.Lighting.Ambient=Color3.new(0,1,0.5)
 	else
-		game.Lighting.Brightness = 2
-		game.Lighting.Ambient = Color3.new(0.5, 0.5, 0.5)
+		game.Lighting.Brightness=2
+		game.Lighting.Ambient=Color3.new(0.5,0.5,0.5)
 	end
 end)
 
 -- Infinite Jump
 UserInputService.JumpRequest:Connect(function()
 	if toggleStates.infJump then
-		local character = player.Character
-		if character and character:FindFirstChild("Humanoid") then
-			character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		local char=player.Character
+		if char and char:FindFirstChild("Humanoid") then
+			char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 		end
 	end
 end)
 
--- NoClip
+-- Noclip
 RunService.Stepped:Connect(function()
-	local character = player.Character
-	if character then
-		for _, part in pairs(character:GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.CanCollide = not toggleStates.noclip
+	if toggleStates.noclip then
+		local char=player.Character
+		if char then
+			for _,part in pairs(char:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide=false
+				end
 			end
 		end
 	end
 end)
 
--- Fly System
-local flySpeed = 50
-local flying = false
-
+-- Fly
+local flySpeed=50
 RunService.RenderStepped:Connect(function()
 	if toggleStates.fly then
-		local character = player.Character
-		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local char=player.Character
+		local root=char and char:FindFirstChild("HumanoidRootPart")
 		if root then
-			flying = true
-			local move = Vector3.zero
-			if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-				move = move + (workspace.CurrentCamera.CFrame.LookVector)
-			end
-			if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-				move = move - (workspace.CurrentCamera.CFrame.LookVector)
-			end
-			if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-				move = move - (workspace.CurrentCamera.CFrame.RightVector)
-			end
-			if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-				move = move + (workspace.CurrentCamera.CFrame.RightVector)
-			end
-			if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-				move = move + Vector3.new(0,1,0)
-			end
-			if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-				move = move - Vector3.new(0,1,0)
-			end
-			root.Velocity = move * flySpeed
+			local move=Vector3.zero
+			if UserInputService:IsKeyDown(Enum.KeyCode.W) then move+=workspace.CurrentCamera.CFrame.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.S) then move-=workspace.CurrentCamera.CFrame.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.A) then move-=workspace.CurrentCamera.CFrame.RightVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.D) then move+=workspace.CurrentCamera.CFrame.RightVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move+=Vector3.new(0,1,0) end
+			if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then move-=Vector3.new(0,1,0) end
+			root.Velocity=move*flySpeed
 		end
-	else
-		flying = false
 	end
 end)
 
--- Minimize/maximize
-minButton.MouseButton1Click:Connect(function()
-	if minimized then
-		frame.Size = UDim2.new(0, 280, 0, 520)
-		minButton.Text = "–"
-		for _, child in pairs(frame:GetChildren()) do
-			if child ~= titleBar and child ~= minButton then
-				child.Visible = true
-			end
-		end
-	else
-		frame.Size = UDim2.new(0, 280, 0, 40)
-		minButton.Text = "+"
-		for _, child in pairs(frame:GetChildren()) do
-			if child ~= titleBar and child ~= minButton then
-				child.Visible = false
-			end
+-- Fling system
+local flingSpin
+local looping=false
+local function startFling()
+	if flingSpin then flingSpin:Destroy() end
+	local char=player.Character
+	if not char then return end
+	local hrp=char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	flingSpin=Instance.new("BodyAngularVelocity")
+	flingSpin.AngularVelocity=Vector3.new(0,999999,0)
+	flingSpin.MaxTorque=Vector3.new(999999,999999,999999)
+	flingSpin.P=10000
+	flingSpin.Parent=hrp
+end
+local function stopFling()
+	if flingSpin then flingSpin:Destroy() flingSpin=nil end
+end
+local function findTarget(name)
+	local nameLower=name:lower()
+	for _,p in pairs(Players:GetPlayers()) do
+		if p~=player and p.Name:lower():sub(1,#nameLower)==nameLower then
+			return p
 		end
 	end
-	minimized = not minimized
+end
+local function flingOnce(target)
+	if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
+	local hrp=player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		hrp.CFrame=target.Character.HumanoidRootPart.CFrame+Vector3.new(2,0,0)
+		startFling()
+	end
+end
+flingBtn.MouseButton1Click:Connect(function()
+	local t=findTarget(nameBox.Text)
+	if t then flingOnce(t) else warn("Player not found") end
+end)
+loopBtn.MouseButton1Click:Connect(function()
+	looping=not looping
+	loopBtn.Text=looping and "🔁 Loop Fling: ON" or "🔁 Loop Fling: OFF"
+	if not looping then stopFling() end
+end)
+RunService.Heartbeat:Connect(function()
+	if looping then
+		local t=findTarget(nameBox.Text)
+		if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp=player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				hrp.CFrame=t.Character.HumanoidRootPart.CFrame+Vector3.new(2,0,0)
+				startFling()
+			end
+		else stopFling() end
+	end
+end)
+
+-- Tab switching
+generalTab.MouseButton1Click:Connect(function()
+	generalContainer.Visible=true
+	teleportContainer.Visible=false
+	generalTab.BackgroundColor3=Color3.fromRGB(40,40,60)
+	teleportTab.BackgroundColor3=Color3.fromRGB(30,30,50)
+	updateCanvas(generalContainer)
+end)
+teleportTab.MouseButton1Click:Connect(function()
+	generalContainer.Visible=false
+	teleportContainer.Visible=true
+	generalTab.BackgroundColor3=Color3.fromRGB(30,30,50)
+	teleportTab.BackgroundColor3=Color3.fromRGB(40,40,60)
+	updateCanvas(teleportContainer)
+end)
+
+-- Minimize
+minButton.MouseButton1Click:Connect(function()
+	if minimized then
+		frame.Size=UDim2.new(0,320,0,520)
+		minButton.Text="–"
+		scroll.Visible=true
+		tabFrame.Visible=true
+	else
+		frame.Size=UDim2.new(0,320,0,40)
+		minButton.Text="+"
+		scroll.Visible=false
+		tabFrame.Visible=false
+	end
+	minimized=not minimized
 end)
